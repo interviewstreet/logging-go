@@ -1,6 +1,9 @@
 # Go Logging SDK
 Go SDK for supporting structured logging in applications
 
+## Installation
+`go install github.com/interviewstreet/logging-go@latest`
+
 ## Usage
 ```go
 package logginggo_test
