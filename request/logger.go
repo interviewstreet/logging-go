@@ -1,13 +1,15 @@
+// Package to initialise and expose middleware/s which support structured request logging
 package request
 
 import (
 	"fmt"
+	"os"
+	"sync"
+
 	"github.com/interviewstreet/logging-go/core"
 	"github.com/mcuadros/go-defaults"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"os"
-	"sync"
 )
 
 var (

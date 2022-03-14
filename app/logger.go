@@ -1,13 +1,15 @@
+// Package to initialise and expose application logger
 package app
 
 import (
+	"os"
+	"sync"
+
 	"github.com/google/uuid"
 	"github.com/interviewstreet/logging-go/core"
 	"github.com/mcuadros/go-defaults"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"os"
-	"sync"
 )
 
 var (
