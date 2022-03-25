@@ -42,7 +42,7 @@ func createNewLogger(namespace string, options *core.LoggerOptions) *zap.Sugared
 			TimeKey:    "timestamp",
 			LevelKey:   zapcore.OmitKey,
 			MessageKey: zapcore.OmitKey,
-			NameKey:    "request_logger",
+			NameKey:    "logger_name",
 			LineEnding: zapcore.DefaultLineEnding,
 			EncodeTime: zapcore.EpochMillisTimeEncoder,
 		},
@@ -56,5 +56,5 @@ func createNewLogger(namespace string, options *core.LoggerOptions) *zap.Sugared
 	if err != nil {
 		panic(fmt.Sprintf("Failed to initialise request logger, error: %s", err))
 	}
-	return l.Sugar()
+	return l.Sugar().Named("request")
 }

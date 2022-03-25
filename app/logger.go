@@ -42,7 +42,7 @@ func createNewLogger(namespace string, level zapcore.Level, options *core.Logger
 		EncoderConfig: zapcore.EncoderConfig{
 			TimeKey:        "timestamp",
 			LevelKey:       "severity",
-			NameKey:        zapcore.OmitKey,
+			NameKey:        "logger_name",
 			FunctionKey:    "source_function",
 			CallerKey:      "source_caller",
 			MessageKey:     "text_payload",
@@ -60,7 +60,7 @@ func createNewLogger(namespace string, level zapcore.Level, options *core.Logger
 		},
 	}
 	l, _ := config.Build(zap.AddStacktrace(zapcore.ErrorLevel), zap.Fields())
-	return l.Sugar()
+	return l.Sugar().Named("application")
 }
 
 // SetupLogger initialises the logging configuration
