@@ -1,7 +1,8 @@
-// Package to initialise and expose application logger
+// Package app Package to initialise and expose application logger
 package app
 
 import (
+	"github.com/gin-gonic/gin"
 	"os"
 	"sync"
 
@@ -13,8 +14,9 @@ import (
 )
 
 var (
-	baseLogger *zap.SugaredLogger
-	loggerOnce sync.Once // Used for ensuring that logger initialisation is only done once.
+	baseLogger    *zap.SugaredLogger
+	loggerOnce    sync.Once // Used for ensuring that logger initialisation is only done once.
+	contextHeader string
 )
 
 func getProcessInfo() map[string]interface{} {
@@ -26,11 +28,6 @@ func getProcessInfo() map[string]interface{} {
 }
 
 func createNewLogger(namespace string, level zapcore.Level, options *core.LoggerOptions) *zap.SugaredLogger {
-	if options == nil {
-		options = &core.LoggerOptions{}
-	}
-	defaults.SetDefaults(options)
-
 	atom := zap.NewAtomicLevel()
 	atom.SetLevel(level)
 
@@ -66,16 +63,23 @@ func createNewLogger(namespace string, level zapcore.Level, options *core.Logger
 // SetupLogger initialises the logging configuration
 func SetupLogger(namespace string, logLevel zapcore.Level, options *core.LoggerOptions) {
 	loggerOnce.Do(func() {
+		// Populate with defaults
+		if options == nil {
+			options = &core.LoggerOptions{}
+		}
+		defaults.SetDefaults(options)
+		// Create a new logger
 		baseLogger = createNewLogger(namespace, logLevel, options)
+		// Set the HTTP header name from where context_id will be extracted
+		contextHeader = options.ContextIDHeader
 	})
 }
 
-// NewWithCtx returns a logger instance with `context_id` defined as per the argument.
-//
-// This function doesn't create a new logger but instead creates a child logger out of already global logger
-// initialised during SetupLogger
-func NewWithCtx(contextID string) *zap.SugaredLogger {
-	return baseLogger.With("context_id", contextID, zap.Namespace("labels"))
+// checkInitialisation validates whether the singleton logger variable is properly initialised or not
+func checkInitialisation() {
+	if baseLogger == nil {
+		panic("Logger not initialised, make sure `SetupLogger` is called before")
+	}
 }
 
 // New returns a logger instance. A new `context_id` is auto-generated during this call.
@@ -83,7 +87,26 @@ func NewWithCtx(contextID string) *zap.SugaredLogger {
 // This function doesn't create a new logger but instead creates a child logger out of already global logger
 // initialised during SetupLogger
 func New() *zap.SugaredLogger {
+	checkInitialisation()
 	// Generate a unique context id
 	contextID := uuid.NewString()
 	return baseLogger.With("context_id", contextID, zap.Namespace("labels"))
+}
+
+// NewWithCtx returns a logger instance with `context_id` defined as per the argument.
+//
+// This function doesn't create a new logger but instead creates a child logger out of already global logger
+// initialised during SetupLogger
+func NewWithCtx(contextID string) *zap.SugaredLogger {
+	checkInitialisation()
+	return baseLogger.With("context_id", contextID, zap.Namespace("labels"))
+}
+
+// NewWithGinCtx returns a logger instance with gin Context as an argument to extract `context_id` from request
+// headers.
+// This function doesn't create a new logger but instead creates a child logger out of already global logger
+// initialised during SetupLogger
+func NewWithGinCtx(ctx *gin.Context) *zap.SugaredLogger {
+	checkInitialisation()
+	return baseLogger.With("context_id", ctx.GetHeader(contextHeader), zap.Namespace("labels"))
 }

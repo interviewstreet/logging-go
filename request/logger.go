@@ -1,4 +1,4 @@
-// Package to initialise and expose middleware/s which support structured request logging
+// Package request Package to initialise and expose middleware/s which support structured request logging
 package request
 
 import (

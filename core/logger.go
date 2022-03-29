@@ -4,6 +4,7 @@ type LoggerOptions struct {
 	Env             string `default:"production"`
 	OutputPath      string `default:"stdout"`
 	ErrorOutputPath string `default:"stderr"`
+	ContextIDHeader string `default:"x-request-id"`
 }
 
 type RequestMiddlewareOptions struct {
