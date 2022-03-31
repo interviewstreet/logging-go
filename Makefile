@@ -18,5 +18,11 @@ gomod_tidy:
 gofmt:
 	go fmt -x ./...
 
+test-app:
+	cd app; go test
+
+test-request:
+	cd request; go test
+
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'

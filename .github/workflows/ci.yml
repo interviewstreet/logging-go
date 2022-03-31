@@ -34,8 +34,10 @@ jobs:
           exit 1
         fi
 
-    - name: Build
+    - name: Test app
       run: |
-        make compile-app
-        make compile-core
-        make compile-request
+        make test-app
+
+    - name: Test request
+      run: |
+        make test-request
