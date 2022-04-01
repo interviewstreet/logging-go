@@ -2,15 +2,17 @@ package app
 
 import (
 	"bytes"
-	"fmt"
+	"encoding/json"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/interviewstreet/logging-go/core"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"testing"
 )
 
@@ -19,100 +21,102 @@ type MemorySink struct {
 	*bytes.Buffer
 }
 
-var sink *MemorySink
-
 // Implement Close and Sync as no-ops to satisfy the interface. The Write
 // method is provided by the embedded buffer.
 func (s *MemorySink) Close() error { return nil }
 func (s *MemorySink) Sync() error  { return nil }
 
-const (
-	testTextPayload = "Choosing an Agent"
-	testKey         = "agent_name"
-	testKeyValue    = "chamber"
-	testCtxID       = "match-622"
-	namespace       = "test"
-)
+const sampleHttpURI = "/select_agent"
 
-func setupTest() {
-	// Create a sink instance, and register it with zap for the "memory"
-	// protocol.
-	sink = &MemorySink{new(bytes.Buffer)}
-	_ = zap.RegisterSink("memory", func(*url.URL) (zap.Sink, error) {
-		return sink, nil
-	})
-	SetupLogger(namespace, zapcore.InfoLevel, &core.LoggerOptions{
-		Env: namespace, OutputPath: "memory://", ErrorOutputPath: "memory://",
-	})
+type TestData struct {
+	payload       string
+	key           string
+	value         string
+	contextID     string
+	namespace     string
+	contextHeader string
 }
 
-func assertFields(t *testing.T, output, key, value string) {
-	compareWith := fmt.Sprintf(`"%s":"%s"`, key, value)
-	if !strings.Contains(output, compareWith) {
-		t.Errorf("Test failed for `%s` key", key)
+type TestSuite struct {
+	suite.Suite
+	sink       *MemorySink
+	httpRouter *gin.Engine
+	data       TestData
+}
+
+func (s *TestSuite) SetupSuite() {
+	// Set test data
+	s.data = TestData{
+		payload:       "Choosing an Agent",
+		key:           "agent_name",
+		value:         "chamber",
+		contextID:     uuid.NewString(),
+		namespace:     "test",
+		contextHeader: "x-request-id",
 	}
-}
-
-// TestNew runs test-cases with default generated context-id
-func TestNew(t *testing.T) {
-	t.Parallel()
-	setupTest()
-
-	log := New()
-	log.Infow(testTextPayload, testKey, testKeyValue)
-
-	// Assert sink contents
-	output := sink.String()
-	t.Logf("output = %s", output)
-
-	assertFields(t, output, "text_payload", testTextPayload)
-	assertFields(t, output, testKey, testKeyValue)
-	assertFields(t, output, "environment", namespace)
-	assertFields(t, output, "namespace", namespace)
-}
-
-// TestNewWithCtx runs test-cases with provided context-id
-func TestNewWithCtx(t *testing.T) {
-	t.Parallel()
-	setupTest()
-
-	log := NewWithCtx(testCtxID)
-	log.Infow(testTextPayload, testKey, testKeyValue)
-
-	// Assert sink contents
-	output := sink.String()
-	t.Logf("output = %s", output)
-
-	assertFields(t, output, "text_payload", testTextPayload)
-	assertFields(t, output, testKey, testKeyValue)
-	assertFields(t, output, "environment", namespace)
-	assertFields(t, output, "namespace", namespace)
-	assertFields(t, output, "context_id", testCtxID)
-}
-
-// TestNewWithCtx runs test-cases with provided gin context
-func TestNewWithGinCtx(t *testing.T) {
-	t.Parallel()
-	setupTest()
-
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-	router.GET("/select_agent", func(context *gin.Context) {
-		logger := NewWithGinCtx(context)
-		logger.Infow(testTextPayload, testKey, testKeyValue)
-		context.String(200, testKeyValue)
+	s.sink = &MemorySink{new(bytes.Buffer)}
+	if err := zap.RegisterSink("memory", func(url *url.URL) (zap.Sink, error) {
+		return s.sink, nil
+	}); err != nil {
+		s.Error(err, "Failed to register memory sink with zap")
+	}
+	SetupLogger(s.data.namespace, zapcore.InfoLevel, &core.LoggerOptions{
+		Env: s.data.namespace, OutputPath: "memory://",
 	})
+
+	// Setup gin
+	gin.SetMode(gin.TestMode)
+	s.httpRouter = gin.New()
+}
+
+func (s *TestSuite) AfterTest(_, _ string) {
+	s.sink.Reset()
+}
+
+func (s TestSuite) commonTests(output map[string]interface{}) {
+	s.Equal(s.data.payload, output["text_payload"], "Payload test failed")
+	logContexts := output["labels"].(map[string]interface{})
+	s.Equal(s.data.value, logContexts[s.data.key], "Log key-value context test failed")
+	s.Equal(s.data.namespace, output["namespace"], "Namespace test failed")
+}
+
+func (s *TestSuite) TestNew() {
+	log := New()
+	log.Infow(s.data.payload, s.data.key, s.data.value)
+	var output map[string]interface{}
+	_ = json.Unmarshal(s.sink.Bytes(), &output)
+	s.commonTests(output)
+}
+
+func (s *TestSuite) TestNewWithCtx() {
+	log := NewWithCtx(s.data.contextID)
+	log.Infow(s.data.payload, s.data.key, s.data.value)
+	var output map[string]interface{}
+	_ = json.Unmarshal(s.sink.Bytes(), &output)
+	s.commonTests(output)
+	s.Equal(s.data.contextID, output["context_id"])
+}
+
+func (s TestSuite) exampleHTTPRoute(ctx *gin.Context) {
+	logger := NewWithGinCtx(ctx)
+	logger.Infow(s.data.payload, s.data.key, s.data.value)
+	ctx.String(200, s.data.value)
+}
+
+func (s *TestSuite) TestNewWithGinCtx() {
+	s.httpRouter.GET(sampleHttpURI, s.exampleHTTPRoute)
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/select_agent", nil)
-	req.Header.Set("x-request-id", testCtxID)
-	router.ServeHTTP(w, req)
+	req, _ := http.NewRequest("GET", sampleHttpURI, nil)
+	req.Header.Set(s.data.contextHeader, s.data.contextID)
+	s.httpRouter.ServeHTTP(w, req)
 
-	output := sink.String()
-	t.Logf("output = %s", output)
+	var output map[string]interface{}
+	_ = json.Unmarshal(s.sink.Bytes(), &output)
+	s.commonTests(output)
+	s.Equal(s.data.contextID, output["context_id"])
+}
 
-	assertFields(t, output, "text_payload", testTextPayload)
-	assertFields(t, output, testKey, testKeyValue)
-	assertFields(t, output, "environment", namespace)
-	assertFields(t, output, "namespace", namespace)
-	assertFields(t, output, "context_id", testCtxID)
+func TestApplicationLoggers(t *testing.T) {
+	assert.Panics(t, checkInitialisation)
+	suite.Run(t, new(TestSuite))
 }
