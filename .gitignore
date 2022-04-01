@@ -16,3 +16,7 @@
 
 # IDE files
 .idea
+
+# Build
+
+build/

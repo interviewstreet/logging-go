@@ -1,0 +1,43 @@
+name: Logging Go CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    name: Build 1Click
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: '1.17.3'
+
+    - name: Check Go fmt
+      run: make gofmt
+
+    - name: Check go mod status
+      run: |
+        make gomod_tidy
+        if [[ ! -z $(git status -s) ]]
+        then
+          echo "Go mod - state is not clean:"
+          git status -s
+          git diff "$GITHUB_SHA"
+          exit 1
+        fi
+
+    - name: Test app
+      run: |
+        make test-app
+
+    - name: Test request
+      run: |
+        make test-request
