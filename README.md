@@ -2,7 +2,10 @@
 Go SDK for supporting structured logging in applications
 
 ## Installation
-`go install github.com/interviewstreet/logging-go@latest`
+```console
+go get github.com/interviewstreet/logging-go@latest
+go mod tidy
+```
 
 ## Usage
 ```go
