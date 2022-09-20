@@ -10,6 +10,15 @@ import (
 	"time"
 )
 
+func contains(s []string, str string) bool {
+	for _, v := range s {
+		if v == str {
+			return true
+		}
+	}
+	return false
+}
+
 // getQueryParams parses request for query parameters and converts them to a map
 func getQueryParams(req *http.Request) map[string]string {
 	params := req.URL.Query()
@@ -62,6 +71,13 @@ func GinMiddleware(namespace string, options *core.RequestMiddlewareOptions) gin
 	})
 
 	return func(context *gin.Context) {
+		uri := getUri(context.Request)
+
+		// Don't log if path is ignored
+		if contains(options.IgnoredPaths, uri) {
+			return
+		}
+
 		t0 := time.Now()
 
 		// Extract information before request execution
@@ -70,7 +86,7 @@ func GinMiddleware(namespace string, options *core.RequestMiddlewareOptions) gin
 			"method", context.Request.Method,
 			"request_headers", cleanHeaders(context.Request.Header),
 			"url", getUrl(context.Request),
-			"uri", getUri(context.Request),
+			"uri", uri,
 			"querystring", getQueryParams(context.Request),
 			"context_id", getContextId(context.Request, options.ContextIDHeader),
 		}
