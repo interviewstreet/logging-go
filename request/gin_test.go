@@ -42,11 +42,19 @@ func (s *GinTestSuite) SetupSuite() {
 	}
 	gin.SetMode(gin.TestMode)
 	s.router = gin.New()
-	s.router.Use(GinMiddleware("test", &core.RequestMiddlewareOptions{Env: "test", OutputPath: "memory://"}))
+	s.router.Use(GinMiddleware("test", &core.RequestMiddlewareOptions{
+		Env: "test", OutputPath: "memory://", IgnoredPaths: []string{"/test"},
+	}))
 	s.router.Use(gin.Recovery())
 }
 
+func (s *GinTestSuite) cleanupMemorySink() {
+	s.sink = &MemorySink{new(bytes.Buffer)}
+}
+
 func (s *GinTestSuite) TestGetRequest() {
+	defer s.cleanupMemorySink()
+
 	s.router.GET("/ping", func(context *gin.Context) {
 		context.String(200, "pong")
 	})
@@ -62,6 +70,22 @@ func (s *GinTestSuite) TestGetRequest() {
 	s.Equal(s.data.method, output["method"])
 	urlParams := output["querystring"].(map[string]interface{})
 	s.Equal(s.data.sortParam, urlParams["sort"])
+}
+
+func (s *GinTestSuite) TestIgnoredRequest() {
+	defer s.cleanupMemorySink()
+
+	s.router.GET("/test", func(context *gin.Context) {
+		context.String(200, "passed")
+	})
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/test", nil)
+	s.router.ServeHTTP(w, req)
+
+	var output map[string]interface{}
+	_ = json.Unmarshal(s.sink.Bytes(), &output)
+
+	s.Empty(output)
 }
 
 func TestGinMiddleware(t *testing.T) {
