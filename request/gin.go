@@ -97,7 +97,7 @@ func GinMiddleware(namespace string, options *core.RequestMiddlewareOptions) gin
 			"request_headers", cleanHeaders(c.Request.Header),
 			"url", getUrl(c.Request),
 			"uri", uri,
-			"query_string", getQueryParams(c.Request),
+			"querystring", getQueryParams(c.Request),
 			"trace_id", getContextId(c.Request, options.ContextIDHeader),
 		}
 
