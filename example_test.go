@@ -39,7 +39,7 @@ func AddController(ctx *gin.Context) {
 
 func SubtractController(ctx *gin.Context) {
 	// Get a new logger object with pre-existing context
-	log := app.NewWithCtx(ctx.Request.Header.Get("x-request-id"))
+	log := app.NewWithContextID(ctx.Request.Header.Get("x-request-id"))
 	log.Info("Subtract 2 from 5")
 
 	// Pass the parent logger to child functions

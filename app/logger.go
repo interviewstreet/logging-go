@@ -2,16 +2,19 @@
 package app
 
 import (
-	"github.com/gin-gonic/gin"
+	"context"
 	"os"
 	"sync"
 
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/interviewstreet/logging-go/core"
 	"github.com/mcuadros/go-defaults"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
+
+const TraceIDKey = "trace_id"
 
 var (
 	baseLogger    *zap.SugaredLogger
@@ -93,11 +96,11 @@ func New() *zap.SugaredLogger {
 	return baseLogger.With("context_id", contextID, zap.Namespace("labels"))
 }
 
-// NewWithCtx returns a logger instance with `context_id` defined as per the argument.
+// NewWithContextID returns a logger instance with `context_id` defined as per the argument.
 //
 // This function doesn't create a new logger but instead creates a child logger out of already global logger
 // initialised during SetupLogger
-func NewWithCtx(contextID string) *zap.SugaredLogger {
+func NewWithContextID(contextID string) *zap.SugaredLogger {
 	checkInitialisation()
 	return baseLogger.With("context_id", contextID, zap.Namespace("labels"))
 }
@@ -109,4 +112,13 @@ func NewWithCtx(contextID string) *zap.SugaredLogger {
 func NewWithGinCtx(ctx *gin.Context) *zap.SugaredLogger {
 	checkInitialisation()
 	return baseLogger.With("context_id", ctx.GetHeader(contextHeader), zap.Namespace("labels"))
+}
+
+// NewWithCtx returns a logger instance with context.Context as an argument to extract `trace_id` from the
+// context.
+// This function doesn't create a new logger but instead creates a child logger out of already global logger
+// initialised during SetupLogger
+func NewWithCtx(ctx context.Context) *zap.SugaredLogger {
+	checkInitialisation()
+	return baseLogger.With("trace_id", ctx.Value(TraceIDKey).(string), zap.Namespace("labels"))
 }
