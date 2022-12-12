@@ -1,13 +1,17 @@
 package request
 
 import (
+	"context"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-	"github.com/interviewstreet/logging-go/core"
-	"github.com/mcuadros/go-defaults"
 	"net/http"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/mcuadros/go-defaults"
+
+	"github.com/interviewstreet/logging-go/app"
+	"github.com/interviewstreet/logging-go/core"
 )
 
 func contains(s []string, str string) bool {
@@ -70,8 +74,8 @@ func GinMiddleware(namespace string, options *core.RequestMiddlewareOptions) gin
 		baseLogger = createNewLogger(namespace, &core.LoggerOptions{Env: options.Env, OutputPath: options.OutputPath})
 	})
 
-	return func(context *gin.Context) {
-		uri := getUri(context.Request)
+	return func(c *gin.Context) {
+		uri := getUri(c.Request)
 
 		// Don't log if path is ignored
 		if contains(options.IgnoredPaths, uri) {
@@ -80,22 +84,28 @@ func GinMiddleware(namespace string, options *core.RequestMiddlewareOptions) gin
 
 		t0 := time.Now()
 
+		if options.AddTraceID {
+			ctx := c.Request.Context()
+			ctx = context.WithValue(ctx, app.TraceIDKey, getContextId(c.Request, options.ContextIDHeader))
+			c.Request = c.Request.WithContext(ctx)
+		}
+
 		// Extract information before request execution
 		fields := []interface{}{
-			"client_ip", context.ClientIP(),
-			"method", context.Request.Method,
-			"request_headers", cleanHeaders(context.Request.Header),
-			"url", getUrl(context.Request),
+			"client_ip", c.ClientIP(),
+			"method", c.Request.Method,
+			"request_headers", cleanHeaders(c.Request.Header),
+			"url", getUrl(c.Request),
 			"uri", uri,
-			"querystring", getQueryParams(context.Request),
-			"context_id", getContextId(context.Request, options.ContextIDHeader),
+			"querystring", getQueryParams(c.Request),
+			"trace_id", getContextId(c.Request, options.ContextIDHeader),
 		}
 
 		// Wait for the request controller to return
-		context.Next()
+		c.Next()
 
 		fields = append(fields, "latency", time.Since(t0).Microseconds())
-		response := context.Writer
+		response := c.Writer
 		fields = append(fields, "status", response.Status(), "response_headers", cleanHeaders(response.Header()))
 		baseLogger.Infow("", fields...)
 	}

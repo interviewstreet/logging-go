@@ -3,14 +3,16 @@ package request
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/gin-gonic/gin"
-	"github.com/interviewstreet/logging-go/core"
-	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/suite"
+	"go.uber.org/zap"
+
+	"github.com/interviewstreet/logging-go/core"
 )
 
 type TestData struct {

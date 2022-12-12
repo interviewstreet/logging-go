@@ -2,7 +2,13 @@ package app
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"testing"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/interviewstreet/logging-go/core"
@@ -10,10 +16,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
-	"testing"
 )
 
 // MemorySink implements zap.Sink by writing all messages to a buffer.
@@ -88,8 +90,8 @@ func (s *TestSuite) TestNew() {
 	s.commonTests(output)
 }
 
-func (s *TestSuite) TestNewWithCtx() {
-	log := NewWithCtx(s.data.contextID)
+func (s *TestSuite) TestNewWithContextID() {
+	log := NewWithContextID(s.data.contextID)
 	log.Infow(s.data.payload, s.data.key, s.data.value)
 	var output map[string]interface{}
 	_ = json.Unmarshal(s.sink.Bytes(), &output)
@@ -116,7 +118,20 @@ func (s *TestSuite) TestNewWithGinCtx() {
 	s.Equal(s.data.contextID, output["context_id"])
 }
 
+func (s *TestSuite) TestNewWithCtx() {
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, TraceIDKey, s.data.contextID)
+
+	log := NewWithCtx(ctx)
+	log.Infow(s.data.payload, s.data.key, s.data.value)
+	var output map[string]interface{}
+	_ = json.Unmarshal(s.sink.Bytes(), &output)
+	s.commonTests(output)
+	s.Equal(s.data.contextID, output["trace_id"])
+}
+
 func TestApplicationLoggers(t *testing.T) {
 	assert.Panics(t, checkInitialisation)
 	suite.Run(t, new(TestSuite))
+
 }
